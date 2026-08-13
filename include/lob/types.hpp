@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <deque>
 
 namespace lob {
 
@@ -28,6 +29,10 @@ namespace lob {
         Price price;
         Quantity quantity;
         Timestamp entryTime;
+    };
+
+    struct PriceLevel {
+        std::deque<Order> orders;
     };
 
 }
