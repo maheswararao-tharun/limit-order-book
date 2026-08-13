@@ -43,10 +43,22 @@ namespace lob {
                 tradeQty = std::min(incomingOrder.quantity, lowestSellOrder.quantity);
                 restingOrderSize = lowestSellOrder.quantity - tradeQty;
                 incomingOrderSize -= tradeQty;
-                if(incomingOrderSize > 0) {
+                if (restingOrderSize == 0) {
+                    // pop the resting order from the deque
+                    Book::lowestSell->second.orders.pop_front();
 
-                } if(incomingOrderSize == 0) {
+                    // if the price level's deque is now empty, erase it and update the pointer
+                    if(Book::lowestSell->second.orders.empty()) {
+                        sellTree.erase(lowestSellPrice);
+                        updateLowestSell();
+                    }
 
+                }
+
+                if (incomingOrderSize == 0) {
+                    // fully matched, nothing left to rest — return empty optional
+                } else {
+                    // still quantity left — loop back and match against the next resting order
                 }
             }
             
@@ -59,12 +71,39 @@ namespace lob {
                 tradeQty = std::min(incomingOrder.quantity, highestBuyOrder.quantity);
                 restingOrderSize = highestBuyOrder.quantity - tradeQty;
                 incomingOrderSize -= tradeQty;
-                if(incomingOrderSize > 0) {
+                if (restingOrderSize == 0) {
+                    // pop the resting order from the deque
+                    // if the price level's deque is now empty, erase it and update the pointer
+                }
 
-                } if(incomingOrderSize == 0) {
-
+                if (incomingOrderSize == 0) {
+                    // fully matched, nothing left to rest — return empty optional
+                } else {
+                    // still quantity left — loop back and match against the next resting order
                 }
             }
+        }
+    }
+
+    bool Book::updateLowestSell() {
+        if (sellTree.begin() != sellTree.end()) {
+            // sellTree.begin() != end() means the tree has at least one entry
+            Book::lowestSell = sellTree.begin();
+            return true;
+        } else {
+            // tree is empty
+            return false;
+        }
+    }
+
+    bool Book::updateHighestBuy() {
+        if(buyTree.rbegin() != buyTree.rend()) {
+            //buyTree.rbegin() != rend() means the tree has at least one entry
+            Book::highestBuy = buyTree.rbegin();
+            return true;
+        } else {
+            //tree is empty
+            return false;
         }
     }
 }
