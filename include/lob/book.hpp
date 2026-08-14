@@ -21,7 +21,6 @@ namespace lob {
     };
 
     void Book::addOrder(Order order) {
-        // your code here
         if(order.side == Side::buy) {
             buyTree[order.price].orders.push_back(order);
         } else {
@@ -30,20 +29,24 @@ namespace lob {
     }
 
     std::optional<Order> Book::matchOrder(Order incomingOrder) {
-        // your code here
         
-        Quantity tradeQty, restingOrderSize, incomingOrderSize = incomingOrder.quantity;
+        Quantity tradeQty, incomingOrderSize = incomingOrder.quantity;
 
         if(incomingOrder.side == Side::buy) {
             if(Book::sellTree.empty()) {
                 return incomingOrder;
-            } else {
+            } 
+            
+            updateLowestSell();
+            while(incomingOrderSize != 0 && !sellTree.empty()) {
                 Price lowestSellPrice = Book::lowestSell->first;
-                Order lowestSellOrder = Book::lowestSell->second.orders.front();
-                tradeQty = std::min(incomingOrder.quantity, lowestSellOrder.quantity);
-                restingOrderSize = lowestSellOrder.quantity - tradeQty;
+                Order& lowestSellOrder = Book::lowestSell->second.orders.front();
+
+                tradeQty = std::min(incomingOrderSize, lowestSellOrder.quantity);
+                lowestSellOrder.quantity -= tradeQty;
                 incomingOrderSize -= tradeQty;
-                if (restingOrderSize == 0) {
+
+                if (lowestSellOrder.quantity == 0) {
                     // pop the resting order from the deque
                     Book::lowestSell->second.orders.pop_front();
 
@@ -52,35 +55,47 @@ namespace lob {
                         sellTree.erase(lowestSellPrice);
                         updateLowestSell();
                     }
-
                 }
+            }
 
-                if (incomingOrderSize == 0) {
-                    // fully matched, nothing left to rest — return empty optional
-                } else {
-                    // still quantity left — loop back and match against the next resting order
-                }
+            if (incomingOrderSize == 0) {
+                return std::nullopt;
+            } else {
+                incomingOrder.quantity = incomingOrderSize;
+                return incomingOrder;
             }
             
         } else {
             if(Book::buyTree.empty()) {
                 return incomingOrder;
-            } else {
-                Price highestBuyPrice = Book::highestBuy->first;
-                Order highestBuyOrder = Book::highestBuy->second.orders.front();
-                tradeQty = std::min(incomingOrder.quantity, highestBuyOrder.quantity);
-                restingOrderSize = highestBuyOrder.quantity - tradeQty;
-                incomingOrderSize -= tradeQty;
-                if (restingOrderSize == 0) {
-                    // pop the resting order from the deque
-                    // if the price level's deque is now empty, erase it and update the pointer
-                }
+            }
 
-                if (incomingOrderSize == 0) {
-                    // fully matched, nothing left to rest — return empty optional
-                } else {
-                    // still quantity left — loop back and match against the next resting order
+            updateHighestBuy();
+            while(incomingOrderSize != 0 && !buyTree.empty()) {
+                Price highestBuyPrice = Book::highestBuy->first;
+                Order& highestBuyOrder = Book::highestBuy->second.orders.front();
+
+                tradeQty = std::min(incomingOrderSize, highestBuyOrder.quantity);
+                highestBuyOrder.quantity -= tradeQty;
+                incomingOrderSize -= tradeQty;
+
+                if (highestBuyOrder.quantity == 0) {
+                    // pop the resting order from the deque
+                    Book::highestBuy->second.orders.pop_front();
+
+                    // if the price level's deque is now empty, erase it and update the pointer
+                    if(Book::highestBuy->second.orders.empty()) {
+                        buyTree.erase(highestBuyPrice);
+                        updateHighestBuy();
+                    }
                 }
+            }
+
+            if (incomingOrderSize == 0) {
+                return std::nullopt;
+            } else {
+                incomingOrder.quantity = incomingOrderSize;
+                return incomingOrder;
             }
         }
     }
