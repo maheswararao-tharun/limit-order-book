@@ -3,6 +3,7 @@
 #include<optional>
 #include<map>
 #include<algorithm>
+#include<unordered_map>
 
 namespace lob {
 
@@ -13,6 +14,7 @@ namespace lob {
         std::map<Price, PriceLevel> sellTree;
         std::map<Price, PriceLevel>::reverse_iterator highestBuy; 
         std::map<Price, PriceLevel>::iterator lowestSell;
+        std::unordered_map<OrderId, std::pair<Side, Price>> orderLoc;
         void addOrder(Order order);
         void cancelOrder(OrderId orderId);
         std::optional<Order> matchOrder(Order incomingOrder);
@@ -21,6 +23,9 @@ namespace lob {
     };
 
     void Book::addOrder(Order order) {
+        Book::orderLoc.insert({order.id, 
+            std::pair<Side, Price>(order.side, order.price)});
+        
         if(order.side == Side::buy) {
             buyTree[order.price].orders.push_back(order);
         } else {
