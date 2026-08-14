@@ -9,7 +9,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_library(lob_core INTERFACE)
-target_include_directories(lob_core INTERFACE ${CMAKE_SOURCE_DIR}/include)
+add_library(lob_core src/book.cpp)
+target_include_directories(lob_core PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 add_subdirectory(tests)
