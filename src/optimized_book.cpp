@@ -120,3 +120,49 @@ std::optional<lob::Order> lob::OptimizedBook::matchOrder(lob::Order incomingOrde
         }
     }
 }
+
+void lob::OptimizedBook::cancelOrder(OrderId orderId) {
+    if(orderLoc.find(orderId) == orderLoc.end()) {
+        return;
+    }
+
+    auto [side, price] = orderLoc.find(orderId)->second;
+
+    if(side == Side::buy) {
+        auto& priceLevelIt = buyTree[price - minTick];
+        auto exactOrder = std::find_if(
+            priceLevelIt.orders.begin(), 
+            priceLevelIt.orders.end(),
+            [orderId](const Order& o) { return o.id == orderId; }
+        );
+
+        if(exactOrder != priceLevelIt.orders.end()) {
+            priceLevelIt.orders.erase(exactOrder);
+        }
+
+        if(priceLevelIt.orders.empty()) {
+            updateHighestBuy();
+        }
+
+        orderLoc.erase(orderId);
+    } else {
+        auto& priceLevelIt = sellTree[price - minTick];
+        auto exactOrder = std::find_if(
+            priceLevelIt.orders.begin(), 
+            priceLevelIt.orders.end(),
+            [orderId](const Order& o) { return o.id == orderId; }
+        );
+
+        if(exactOrder != priceLevelIt.orders.end()) {
+            priceLevelIt.orders.erase(exactOrder);
+        }
+
+        if(priceLevelIt.orders.empty()) {
+            updateLowestSell();
+        }
+
+        orderLoc.erase(orderId);
+    }
+    
+
+}
