@@ -1,4 +1,4 @@
-#include<lob/optimized_book.hpp>
+#include "lob/optimized_book.hpp"
 
 lob::OptimizedBook::OptimizedBook(Price referencePrice, double bandPercentage)
     : buyTree(0), sellTree(0)
@@ -26,4 +26,26 @@ lob::AddResult lob::OptimizedBook::addOrder(Order order) {
         sellTree[order.price - minTick].orders.push_back(order);
         return AddResult::Accepted;
     }
+}
+
+bool lob::OptimizedBook::updateHighestBuy() {
+    for(size_t i = buyTree.size(); i-- > 0; ) {
+        if(!buyTree[i].orders.empty()) {
+            highestBuy = i;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool lob::OptimizedBook::updateLowestSell() {
+    for(size_t i = 0; i < sellTree.size(); i++) {
+        if(!sellTree[i].orders.empty()) {
+            lowestSell = i;
+            return true;
+        }
+    }
+
+    return false;
 }
