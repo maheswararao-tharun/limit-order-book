@@ -1,4 +1,5 @@
 #include "lob/optimized_book.hpp"
+#include "lob/types.hpp"
 
 lob::OptimizedBook::OptimizedBook(Price referencePrice, double bandPercentage)
     : buyTree(0), sellTree(0)
@@ -36,6 +37,7 @@ bool lob::OptimizedBook::updateHighestBuy() {
         }
     }
 
+    highestBuy = -1;
     return false;
 }
 
@@ -47,5 +49,74 @@ bool lob::OptimizedBook::updateLowestSell() {
         }
     }
 
+    lowestSell = -1;
     return false;
+}
+
+std::optional<lob::Order> lob::OptimizedBook::matchOrder(lob::Order incomingOrder) {
+    
+    Quantity tradeQty, incomingOrderSize = incomingOrder.quantity;
+    
+    if(incomingOrder.side == Side::buy) {
+        if(!updateLowestSell()) {
+            return incomingOrder;
+        }
+
+        while(incomingOrderSize != 0 && lowestSell != -1) {
+            Price lowestSellPrice = lowestSell;
+            Order& lowestSellOrder = sellTree[lowestSell].orders.front();
+
+            tradeQty = std::min(incomingOrderSize, lowestSellOrder.quantity);
+            lowestSellOrder.quantity -= tradeQty;
+            incomingOrderSize -= tradeQty;
+
+            if (lowestSellOrder.quantity == 0) {
+                // pop the resting order from the deque
+                sellTree[lowestSell].orders.pop_front();
+
+                // if the price level's deque is now empty, erase it and update the pointer
+                if(sellTree[lowestSell].orders.empty()) {
+                    updateLowestSell();
+                }
+            }
+        }
+
+        if (incomingOrderSize == 0) {
+            return std::nullopt;
+        } else {
+            incomingOrder.quantity = incomingOrderSize;
+            return incomingOrder;
+        }
+
+    } else {
+        if(!updateHighestBuy()) {
+            return incomingOrder;
+        }
+
+        while(incomingOrderSize != 0 && highestBuy != -1) {
+            Price highestBuyPrice = highestBuy;
+            Order& highestBuyOrder = buyTree[highestBuy].orders.front();
+
+            tradeQty = std::min(incomingOrderSize, highestBuyOrder.quantity);
+            highestBuyOrder.quantity -= tradeQty;
+            incomingOrderSize -= tradeQty;
+
+            if (highestBuyOrder.quantity == 0) {
+                // pop the resting order from the deque
+                buyTree[highestBuy].orders.pop_front();
+
+                // if the price level's deque is now empty, erase it and update the pointer
+                if(buyTree[highestBuy].orders.empty()) {
+                    updateHighestBuy();
+                }
+            }
+        }
+
+        if (incomingOrderSize == 0) {
+            return std::nullopt;
+        } else {
+            incomingOrder.quantity = incomingOrderSize;
+            return incomingOrder;
+        }
+    }
 }
