@@ -10,3 +10,20 @@ lob::OptimizedBook::OptimizedBook(Price referencePrice, double bandPercentage)
     highestBuy = -1;
     lowestSell = -1;
 }
+
+lob::AddResult lob::OptimizedBook::addOrder(Order order) {
+    if(order.price < minTick || order.price > maxTick) {
+        return lob::AddResult::Rejected;
+    }
+
+    OptimizedBook::orderLoc.insert({order.id, 
+        std::pair<Side, Price>(order.side, order.price)});
+
+    if(order.side == Side::buy) {
+        buyTree[order.price - minTick].orders.push_back(order);
+        return AddResult::Accepted;
+    } else {
+        sellTree[order.price - minTick].orders.push_back(order);
+        return AddResult::Accepted;
+    }
+}
