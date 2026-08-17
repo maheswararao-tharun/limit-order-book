@@ -21,6 +21,11 @@ namespace lob {
         Price highestBuy;   // -1 means "no resting buy orders at all"
         Price lowestSell;   // -1 means "no resting sell orders at all"
         std::unordered_map<OrderId, std::pair<Side, Price>> orderLoc;
+        // One bit per price level: 1 = has resting orders, 0 = empty.
+        // Lets updateHighestBuy/updateLowestSell skip 64 empty levels
+        // per check instead of one at a time.
+        std::vector<uint64_t> buyBitset;
+        std::vector<uint64_t> sellBitset;
 
         OptimizedBook(Price referencePrice, double bandPercentage);
 

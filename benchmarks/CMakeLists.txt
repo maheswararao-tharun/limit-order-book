@@ -1,0 +1,2 @@
+add_executable(lob_benchmarks bench_book.cpp)
+target_link_libraries(lob_benchmarks PRIVATE lob_core benchmark::benchmark)

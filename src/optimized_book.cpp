@@ -1,168 +1,139 @@
 #include "lob/optimized_book.hpp"
-#include "lob/types.hpp"
+#include <algorithm>
 
-lob::OptimizedBook::OptimizedBook(Price referencePrice, double bandPercentage)
+namespace lob {
+
+namespace {
+    inline void setBit(std::vector<uint64_t>& bitset, size_t index) {
+        bitset[index / 64] |= (1ULL << (index % 64));
+    }
+    inline void clearBit(std::vector<uint64_t>& bitset, size_t index) {
+        bitset[index / 64] &= ~(1ULL << (index % 64));
+    }
+}
+
+OptimizedBook::OptimizedBook(Price referencePrice, double bandPercentage)
     : buyTree(0), sellTree(0)
 {
     minTick = referencePrice - static_cast<Price>(referencePrice * (bandPercentage / 100));
     maxTick = referencePrice + static_cast<Price>(referencePrice * (bandPercentage / 100));
-    buyTree.resize(maxTick - minTick + 1);
-    sellTree.resize(maxTick - minTick + 1);
+    size_t numLevels = maxTick - minTick + 1;
+    buyTree.resize(numLevels);
+    sellTree.resize(numLevels);
+    buyBitset.assign((numLevels + 63) / 64, 0);
+    sellBitset.assign((numLevels + 63) / 64, 0);
     highestBuy = -1;
     lowestSell = -1;
 }
 
-lob::AddResult lob::OptimizedBook::addOrder(Order order) {
-    if(order.price < minTick || order.price > maxTick) {
-        return lob::AddResult::Rejected;
-    }
+AddResult OptimizedBook::addOrder(Order order) {
+    if(order.price < minTick || order.price > maxTick) return AddResult::Rejected;
+    orderLoc.insert({order.id, std::pair<Side, Price>(order.side, order.price)});
 
-    OptimizedBook::orderLoc.insert({order.id, 
-        std::pair<Side, Price>(order.side, order.price)});
-
+    size_t index = order.price - minTick;
     if(order.side == Side::buy) {
-        buyTree[order.price - minTick].orders.push_back(order);
-        return AddResult::Accepted;
+        if(buyTree[index].orders.empty()) setBit(buyBitset, index);
+        buyTree[index].orders.push_back(order);
     } else {
-        sellTree[order.price - minTick].orders.push_back(order);
-        return AddResult::Accepted;
+        if(sellTree[index].orders.empty()) setBit(sellBitset, index);
+        sellTree[index].orders.push_back(order);
     }
+    return AddResult::Accepted;
 }
 
-bool lob::OptimizedBook::updateHighestBuy() {
-    for(size_t i = buyTree.size(); i-- > 0; ) {
-        if(!buyTree[i].orders.empty()) {
-            highestBuy = i;
+bool OptimizedBook::updateHighestBuy() {
+    for (size_t w = buyBitset.size(); w-- > 0; ) {
+        uint64_t word = buyBitset[w];
+        if (word != 0) {
+            int bitPos = 63 - __builtin_clzll(word);
+            highestBuy = w * 64 + bitPos;
             return true;
         }
     }
-
     highestBuy = -1;
     return false;
 }
 
-bool lob::OptimizedBook::updateLowestSell() {
-    for(size_t i = 0; i < sellTree.size(); i++) {
-        if(!sellTree[i].orders.empty()) {
-            lowestSell = i;
+bool OptimizedBook::updateLowestSell() {
+    for (size_t w = 0; w < sellBitset.size(); w++) {
+        uint64_t word = sellBitset[w];
+        if (word != 0) {
+            int bitPos = __builtin_ctzll(word);
+            lowestSell = w * 64 + bitPos;
             return true;
         }
     }
-
     lowestSell = -1;
     return false;
 }
 
-std::optional<lob::Order> lob::OptimizedBook::matchOrder(lob::Order incomingOrder) {
-    
+std::optional<Order> OptimizedBook::matchOrder(Order incomingOrder) {
     Quantity tradeQty, incomingOrderSize = incomingOrder.quantity;
-    
     if(incomingOrder.side == Side::buy) {
-        if(!updateLowestSell()) {
-            return incomingOrder;
-        }
-
+        if(!updateLowestSell()) return incomingOrder;
         while(incomingOrderSize != 0 && lowestSell != -1) {
-            Price lowestSellPrice = lowestSell;
             Order& lowestSellOrder = sellTree[lowestSell].orders.front();
-
             tradeQty = std::min(incomingOrderSize, lowestSellOrder.quantity);
             lowestSellOrder.quantity -= tradeQty;
             incomingOrderSize -= tradeQty;
-
             if (lowestSellOrder.quantity == 0) {
-                // pop the resting order from the deque
                 sellTree[lowestSell].orders.pop_front();
-
-                // if the price level's deque is now empty, erase it and update the pointer
                 if(sellTree[lowestSell].orders.empty()) {
+                    clearBit(sellBitset, lowestSell);
                     updateLowestSell();
                 }
             }
         }
-
-        if (incomingOrderSize == 0) {
-            return std::nullopt;
-        } else {
-            incomingOrder.quantity = incomingOrderSize;
-            return incomingOrder;
-        }
-
+        if (incomingOrderSize == 0) return std::nullopt;
+        incomingOrder.quantity = incomingOrderSize;
+        return incomingOrder;
     } else {
-        if(!updateHighestBuy()) {
-            return incomingOrder;
-        }
-
+        if(!updateHighestBuy()) return incomingOrder;
         while(incomingOrderSize != 0 && highestBuy != -1) {
-            Price highestBuyPrice = highestBuy;
             Order& highestBuyOrder = buyTree[highestBuy].orders.front();
-
             tradeQty = std::min(incomingOrderSize, highestBuyOrder.quantity);
             highestBuyOrder.quantity -= tradeQty;
             incomingOrderSize -= tradeQty;
-
             if (highestBuyOrder.quantity == 0) {
-                // pop the resting order from the deque
                 buyTree[highestBuy].orders.pop_front();
-
-                // if the price level's deque is now empty, erase it and update the pointer
                 if(buyTree[highestBuy].orders.empty()) {
+                    clearBit(buyBitset, highestBuy);
                     updateHighestBuy();
                 }
             }
         }
-
-        if (incomingOrderSize == 0) {
-            return std::nullopt;
-        } else {
-            incomingOrder.quantity = incomingOrderSize;
-            return incomingOrder;
-        }
+        if (incomingOrderSize == 0) return std::nullopt;
+        incomingOrder.quantity = incomingOrderSize;
+        return incomingOrder;
     }
 }
 
-void lob::OptimizedBook::cancelOrder(OrderId orderId) {
-    if(orderLoc.find(orderId) == orderLoc.end()) {
-        return;
-    }
-
+void OptimizedBook::cancelOrder(OrderId orderId) {
+    if(orderLoc.find(orderId) == orderLoc.end()) return;
     auto [side, price] = orderLoc.find(orderId)->second;
+    size_t index = price - minTick;
 
     if(side == Side::buy) {
-        auto& priceLevelIt = buyTree[price - minTick];
-        auto exactOrder = std::find_if(
-            priceLevelIt.orders.begin(), 
-            priceLevelIt.orders.end(),
-            [orderId](const Order& o) { return o.id == orderId; }
-        );
-
-        if(exactOrder != priceLevelIt.orders.end()) {
-            priceLevelIt.orders.erase(exactOrder);
-        }
-
+        auto& priceLevelIt = buyTree[index];
+        auto exactOrder = std::find_if(priceLevelIt.orders.begin(), priceLevelIt.orders.end(),
+            [orderId](const Order& o) { return o.id == orderId; });
+        if(exactOrder != priceLevelIt.orders.end()) priceLevelIt.orders.erase(exactOrder);
         if(priceLevelIt.orders.empty()) {
+            clearBit(buyBitset, index);
             updateHighestBuy();
         }
-
         orderLoc.erase(orderId);
     } else {
-        auto& priceLevelIt = sellTree[price - minTick];
-        auto exactOrder = std::find_if(
-            priceLevelIt.orders.begin(), 
-            priceLevelIt.orders.end(),
-            [orderId](const Order& o) { return o.id == orderId; }
-        );
-
-        if(exactOrder != priceLevelIt.orders.end()) {
-            priceLevelIt.orders.erase(exactOrder);
-        }
-
+        auto& priceLevelIt = sellTree[index];
+        auto exactOrder = std::find_if(priceLevelIt.orders.begin(), priceLevelIt.orders.end(),
+            [orderId](const Order& o) { return o.id == orderId; });
+        if(exactOrder != priceLevelIt.orders.end()) priceLevelIt.orders.erase(exactOrder);
         if(priceLevelIt.orders.empty()) {
+            clearBit(sellBitset, index);
             updateLowestSell();
         }
-
         orderLoc.erase(orderId);
     }
-    
+}
 
 }
