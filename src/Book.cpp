@@ -1,6 +1,10 @@
 #include "lob/book.hpp"
 #include<algorithm>
 
+lob::Book::Book(size_t expectedOrders) {
+    orderLoc.reserve(expectedOrders);
+}
+
 void lob::Book::addOrder(Order order) {
     Book::orderLoc.insert({order.id, 
         std::pair<Side, Price>(order.side, order.price)});

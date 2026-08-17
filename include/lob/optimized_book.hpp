@@ -27,7 +27,7 @@ namespace lob {
         std::vector<uint64_t> buyBitset;
         std::vector<uint64_t> sellBitset;
 
-        OptimizedBook(Price referencePrice, double bandPercentage);
+        OptimizedBook(Price referencePrice, double bandPercentage, size_t expectedOrders = 1024);
 
         AddResult addOrder(Order order);
         void cancelOrder(OrderId orderId);

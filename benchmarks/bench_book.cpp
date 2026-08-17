@@ -2,10 +2,20 @@
 #include "lob/book.hpp"
 #include "lob/optimized_book.hpp"
 
+// AddOrder benchmarks periodically reset the book (excluded from timing)
+// to bound orderLoc's growth, since --benchmark_min_time forces enough
+// iterations that an unbounded hash map would otherwise dominate the
+// measurement with rehashing cost unrelated to addOrder's real per-call cost.
+
 static void BM_AddOrder_NaiveBook(benchmark::State& state) {
     lob::Book book;
     lob::OrderId id = 0;
     for (auto _ : state) {
+        if (id % 10000 == 0 && id != 0) {
+            state.PauseTiming();
+            book = lob::Book();
+            state.ResumeTiming();
+        }
         lob::Price price = 200 + (id % 10);
         lob::Order order{.id = id++, .side = lob::Side::buy, .price = price, .quantity = 10, .entryTime = id};
         book.addOrder(order);
@@ -17,6 +27,11 @@ static void BM_AddOrder_OptimizedBook(benchmark::State& state) {
     lob::OptimizedBook book(20000, 5.0);
     lob::OrderId id = 0;
     for (auto _ : state) {
+        if (id % 10000 == 0 && id != 0) {
+            state.PauseTiming();
+            book = lob::OptimizedBook(20000, 5.0);
+            state.ResumeTiming();
+        }
         lob::Price price = 19500 + (id % 10);
         lob::Order order{.id = id++, .side = lob::Side::buy, .price = price, .quantity = 10, .entryTime = id};
         book.addOrder(order);

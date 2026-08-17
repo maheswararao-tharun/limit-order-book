@@ -12,7 +12,7 @@ namespace {
     }
 }
 
-OptimizedBook::OptimizedBook(Price referencePrice, double bandPercentage)
+OptimizedBook::OptimizedBook(Price referencePrice, double bandPercentage, size_t expectedOrders)
     : buyTree(0), sellTree(0)
 {
     minTick = referencePrice - static_cast<Price>(referencePrice * (bandPercentage / 100));
@@ -22,6 +22,7 @@ OptimizedBook::OptimizedBook(Price referencePrice, double bandPercentage)
     sellTree.resize(numLevels);
     buyBitset.assign((numLevels + 63) / 64, 0);
     sellBitset.assign((numLevels + 63) / 64, 0);
+    orderLoc.reserve(expectedOrders);
     highestBuy = -1;
     lowestSell = -1;
 }
