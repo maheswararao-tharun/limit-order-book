@@ -70,12 +70,20 @@ market-data access outside this project's scope.
 Measured with Google Benchmark, on macOS (Apple Silicon). All four
 operations show a consistent improvement for the optimized implementation:
 
-| Operation | Naive | Optimized | Improvement |
-|---|---|---|---|
-| AddOrder | 13.4 ns | 12.4 ns | ~7.5% faster |
-| MatchOrder (sparse book) | 421 ns | 404 ns | ~4% faster |
-| MatchOrder (dense book, 50 resting orders) | 425 ns | 408 ns | ~4% faster |
-| CancelOrder (dense book) | 424 ns | 414 ns | ~2.4% faster |
+| Operation | Naive | Optimized | Improvement | Naive Iterations | Optimized Iterations |
+|---|---|---|---|---|---|
+| AddOrder | 13.4 ns | 12.1 ns | ~9.7% faster | 51,818,074 | 57,565,789 |
+| MatchOrder (sparse book) | 407 ns | 398 ns | ~2.2% faster | 1,710,250 | 1,756,129 |
+| MatchOrder (dense book, 50 resting orders) | 420 ns | 390 ns | ~7.1% faster | 1,668,936 | 1,773,211 |
+| CancelOrder (dense book) | 416 ns | 407 ns | ~2.2% faster | 1,682,745 | 1,699,570 |
+
+Iteration counts are chosen automatically by Google Benchmark until the
+measurement stabilizes — more iterations for faster operations (nanoseconds
+each) and fewer for slower ones (hundreds of nanoseconds each), so the
+total measurement time stays roughly consistent across rows. Benchmarks
+were re-run to confirm stability; results vary by a few percent run-to-run
+(expected on a general-purpose laptop rather than dedicated hardware), but
+the direction and rough magnitude of every result held consistent.
 
 **This wasn't the first result.** An earlier version of the optimized
 book was measurably *slower* at matching (roughly 2.4x) than the naive

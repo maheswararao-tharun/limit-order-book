@@ -28,11 +28,11 @@ We do not control for CPU frequency scaling or use hardware CPU pinning (e.g. Li
 
 ## Results
 
-| Operation | Naive | Optimized | Improvement |
-|---|---|---|---|
-| AddOrder | 13.4 ns | 12.4 ns | ~7.5% faster |
-| MatchOrder (sparse book) | 421 ns | 404 ns | ~4% faster |
-| MatchOrder (dense book, 50 resting orders) | 425 ns | 408 ns | ~4% faster |
-| CancelOrder (dense book) | 424 ns | 414 ns | ~2.4% faster |
+| Operation | Naive | Optimized | Improvement | Naive Iterations | Optimized Iterations |
+|---|---|---|---|---|---|
+| AddOrder | 13.4 ns | 12.1 ns | ~9.7% faster | 51,818,074 | 57,565,789 |
+| MatchOrder (sparse book) | 407 ns | 398 ns | ~2.2% faster | 1,710,250 | 1,756,129 |
+| MatchOrder (dense book, 50 resting orders) | 420 ns | 390 ns | ~7.1% faster | 1,668,936 | 1,773,211 |
+| CancelOrder (dense book) | 416 ns | 407 ns | ~2.2% faster | 1,682,745 | 1,699,570 |
 
 All four operations show a consistent, if modest, improvement for the optimized implementation, confirmed stable across two independent runs at very different iteration scales (millions vs. hundreds of millions of iterations). A profiling pass (macOS `sample`) surfaced a real, initially-unrelated bottleneck: `orderLoc` (the OrderId → Price hash map used for O(1) cancel lookups) was dominating AddOrder's cost under sustained load due to repeated hash-table rehashing as it grew unbounded. This was fixed by pre-reserving its capacity in both implementations' constructors, and the fix was confirmed stable at up to ~500 million iterations.
