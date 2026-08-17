@@ -9,7 +9,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_library(lob_core src/book.cpp src/optimized_book.cpp)
+add_library(lob_core src/book.cpp src/optimized_book.cpp src/itch_parser.cpp)
 target_include_directories(lob_core PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 include(FetchContent)
